@@ -23,6 +23,7 @@ void pmem_init(unsigned int mbi_addr)
     unsigned int nps;
 
     // TODO [Lab 1]: Define your local variables here.
+    
 
     // Calls the lower layer initialization primitive.
     // The parameter mbi_addr should not be used in the further code.
