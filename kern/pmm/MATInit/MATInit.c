@@ -2,9 +2,9 @@
 #include <lib/types.h>
 #include "import.h"
 
-#define PAGESIZE     4096
-#define VM_USERLO    0x40000000
-#define VM_USERHI    0xF0000000
+#define PAGESIZE 4096
+#define VM_USERLO 0x40000000
+#define VM_USERHI 0xF0000000
 #define VM_USERLO_PI (VM_USERLO / PAGESIZE)
 #define VM_USERHI_PI (VM_USERHI / PAGESIZE)
 
@@ -23,7 +23,7 @@ void pmem_init(unsigned int mbi_addr)
     unsigned int nps;
 
     // TODO [Lab 1]: Define your local variables here.
-    
+    // *** not needed here ***
 
     // Calls the lower layer initialization primitive.
     // The parameter mbi_addr should not be used in the further code.
@@ -37,8 +37,18 @@ void pmem_init(unsigned int mbi_addr)
      *       divided by the page size.
      */
     // TODO [Lab 1]
+    unsigned int nrow = get_size();
+    unsigned int max_addr = 0;
+    for (unsigned int i = 0; i < nrow; i++)
+    {
+        unsigned int end_addr = get_mms(i) + get_mml(i);
+        if (end_addr > max_addr)
+            max_addr = end_addr;
+    }
 
-    set_nps(nps);  // Setting the value computed above to NUM_PAGES.
+    nps = max_addr / PAGESIZE;
+
+    set_nps(nps); // Setting the value computed above to NUM_PAGES.
 
     /**
      * Initialization of the physical allocation table (AT).
@@ -64,4 +74,26 @@ void pmem_init(unsigned int mbi_addr)
      *    so in that case, you should consider those pages as unavailable.
      */
     // TODO [Lab 1]
+
+    for (unsigned int i = 0; i < nps; i++)
+    {
+        if (i < VM_USERLO_PI || i >= VM_USERHI_PI)
+            at_set_perm(i, 1);
+        else
+        {
+            unsigned int perm = 0;
+            for (unsigned int j = 0; j < nrow; j++)
+            {
+                if (is_usable(i) &&
+                    get_mms(j) <= i * PAGESIZE &&
+                    (i + 1) * PAGESIZE <= get_mms(j) + get_mms(j))
+                {
+                    perm = 2;
+                    break;
+                }
+            }
+
+            at_set_perm(i, perm);
+        }
+    }
 }
