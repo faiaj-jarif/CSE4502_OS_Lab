@@ -3,12 +3,13 @@
 #include <lib/x86.h>
 #include "import.h"
 
-struct SContainer {
-    int quota;      // maximum memory quota of the process
-    int usage;      // the current memory usage of the process
-    int parent;     // the id of the parent process
-    int nchildren;  // the number of child processes
-    int used;       // whether current container is used by a process
+struct SContainer
+{
+    int quota;     // maximum memory quota of the process
+    int usage;     // the current memory usage of the process
+    int parent;    // the id of the parent process
+    int nchildren; // the number of child processes
+    int used;      // whether current container is used by a process
 };
 
 // mCertiKOS supports up to NUM_IDS processes
@@ -34,6 +35,12 @@ void container_init(unsigned int mbi_addr)
      * in the physical memory allocation table.
      */
 
+    for (unsigned int i = 0, nps = get_nps(); i < nps; i++)
+    {
+        if (at_is_norm(i) && !at_is_allocated(i))
+            real_quota++;
+    }
+
     KERN_DEBUG("\nreal quota: %d\n\n", real_quota);
 
     CONTAINER[0].quota = real_quota;
@@ -42,37 +49,36 @@ void container_init(unsigned int mbi_addr)
     CONTAINER[0].nchildren = 0;
     CONTAINER[0].used = 1;
 
-    for (idx = 0; idx < NUM_IDS; idx++) {
+    for (idx = 0; idx < NUM_IDS; idx++)
         spinlock_init(&container_lks[idx]);
-    }
 }
 
 // Get the id of parent process of process # [id].
 unsigned int container_get_parent(unsigned int id)
 {
     // TODO [Lab 2]
-    return 0;
+    return CONTAINER[id].parent;
 }
 
 // Get the number of children of process # [id].
 unsigned int container_get_nchildren(unsigned int id)
 {
     // TODO [Lab 2]
-    return 0;
+    return CONTAINER[id].nchildren;
 }
 
 // Get the maximum memory quota of process # [id].
 unsigned int container_get_quota(unsigned int id)
 {
     // TODO [Lab 2]
-    return 0;
+    return CONTAINER[id].quota;
 }
 
 // Get the current memory usage of process # [id].
 unsigned int container_get_usage(unsigned int id)
 {
     // TODO [Lab 2]
-    return 0;
+    return CONTAINER[id].usage;
 }
 
 // Determines whether the process # [id] can consume an extra
@@ -80,6 +86,9 @@ unsigned int container_get_usage(unsigned int id)
 unsigned int container_can_consume(unsigned int id, unsigned int n)
 {
     // TODO [Lab 2]
+    if (CONTAINER[id].usage + n <= CONTAINER[id].quota)
+        return 1;
+
     return 0;
 }
 
@@ -96,9 +105,11 @@ unsigned int container_split(unsigned int id, unsigned int quota)
     spinlock_acquire(&container_lks[id]);
 
     nc = CONTAINER[id].nchildren;
-    child = id * MAX_CHILDREN + 1 + nc;  // container index for the child process
+    child = id * MAX_CHILDREN + 1 + nc; // container index for the child process
 
-    if (NUM_IDS <= child) {
+    // added 1 extra condition *** container_can_consume(id, n)
+    if (NUM_IDS <= child || !container_can_consume(id, quota))
+    {
         spinlock_release(&container_lks[id]);
         return NUM_IDS;
     }
@@ -106,6 +117,15 @@ unsigned int container_split(unsigned int id, unsigned int quota)
     /**
      * TODO [Lab 2]: Update the container structure of both parent and child process appropriately.
      */
+
+    CONTAINER[id].usage += quota;
+    CONTAINER[id].nchildren++;
+
+    CONTAINER[child].quota = quota;
+    CONTAINER[child].usage = 0;
+    CONTAINER[child].parent = id;
+    CONTAINER[child].nchildren = 0;
+    CONTAINER[child].used = 1;
 
     spinlock_release(&container_lks[id]);
 
@@ -130,8 +150,10 @@ unsigned int container_alloc(unsigned int id)
      * TODO [Lab 2]: Implement the function here.
      */
 
-    spinlock_release(&container_lks[id]);
+    if (container_can_consume(id, 1) && (page_index = palloc()))
+        CONTAINER[id].usage++;
 
+    spinlock_release(&container_lks[id]);
     return page_index;
 }
 
@@ -141,6 +163,8 @@ void container_free(unsigned int id, unsigned int page_index)
     spinlock_acquire(&container_lks[id]);
 
     // TODO [Lab 2]
+    pfree(page_index);
+    CONTAINER[id].usage--;
 
     spinlock_release(&container_lks[id]);
 }
