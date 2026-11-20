@@ -33,7 +33,7 @@ unsigned int palloc()
     mem_lock();
 
     // TODO [Lab 1]
-    for (unsigned int i = palloc_free_index > VM_USERLO_PI ? palloc_free_index : VM_USERLO_PI; i < VM_USERHI_PI; i++)
+    for (unsigned int i = VM_USERLO_PI; i < VM_USERHI_PI; i++)
     {
         if (at_is_norm(i))
         {
